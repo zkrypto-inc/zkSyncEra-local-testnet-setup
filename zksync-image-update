@@ -1,0 +1,6 @@
+
+FROM matterlabs/local-node:latest2.0
+
+RUN sed -i -e 's/dummy_verifier=true/dummy_verifier=false/g' /etc/env/base/contracts.toml 
+
+

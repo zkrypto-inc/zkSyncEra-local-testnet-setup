@@ -1,0 +1,19 @@
+{
+  "name": "bulk-tx-on-zksync",
+  "version": "1.0.0",
+  "description": "Bulk ETH transfer on zkSync local testnet",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "zkrypto.com",
+  "license": "ISC",
+  "dependencies": {
+    "hardhat": "^2.15.0",
+    "zksync-web3": "^0.14.3"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.1",
+    "typescript": "^5.1.3"
+  }
+}

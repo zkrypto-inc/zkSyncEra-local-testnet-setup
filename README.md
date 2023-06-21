@@ -1,71 +1,115 @@
 # zkSync local development setup
 
-This repository contains the tooling necessary to bootstrap zkSync locally.
+## Install Dependencies 
 
-## Dependencies
+### Installing Docker
+original guide here : https://docs.docker.com/engine/install/ubuntu/#installation-methods
 
-To run zkSync locally, you must have `docker-compose` and `Docker` installed on your machine. 
-
-## Usage
-
-To bootstrap zkSync locally, run the `start.sh` script:
-
-```
-> ./start.sh
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl gnupg
 ```
 
-This command will bootstrap three docker containers:
-- Postgres (used as the database for zkSync).
-- Local Geth node (used as L1 for zkSync).
-- zkSync server itself.
-
-By default, the HTTP JSON-RPC API will run on port `3050`, while WS API will run on port `3051`. 
-
-*Note, that it is important that the first start script goes uninterrupted. If you face any issues after the bootstrapping process unexpectedly stopped, you should [reset](#resetting-zksync-state) the local zkSync state and try again.* 
-
-## Resetting zkSync state
-
-To reset the zkSync state, run the `./clear.sh` script:
-
-```
-> ./clear.sh
+```bash
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
 ```
 
-Note, that you may receive a "permission denied" error when running this command. In this case, you should run it with the root privileges:
-
-```
-> sudo ./clear.sh
-```
-
-## Rich wallets
-
-Local zkSync setup comes with some "rich" wallets with large amounts of ETH on both L1 and L2.
-
-The full list of the addresses of these accounts with the corresponding private keys can be found [here](./rich-wallets.json).
-
-Also, during the initial bootstrapping of the system, several ERC-20 contracts are deployed locally. Note, that large quantities of these ERC-20 belong to the wallet `0x36615Cf349d7F6344891B1e7CA7C72883F5dc049` (the first one in the list of the rich wallet). Right after bootstrapping the system, these ERC-20 funds are available only on L1.
-
-## Using custom database/L1
-
-To use custom Postgres database or Layer 1, you should change the `environment` parameters in the docker-compose file:
-
-```yml
-environment:
-    - DATABASE_URL=postgres://postgres@postgres/zksync_local
-    - ETH_CLIENT_WEB3_URL=http://geth:8545
+```bash
+echo \
+  "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 ```
 
-- `DATABASE_URL` is the URL to the Postgres database.
-- `ETH_CLIENT_WEB3_URL` is the URL to the HTTP JSON-RPC interface of the L1 node.
-
-## Local testing example
-
-You can an example of hardhat project that utilizes local testing capabilities [here](https://github.com/matter-labs/tutorial-examples/tree/main/local-setup-testing).
-
-To run tests, clone the repo and run `yarn test`:
-
+```bash
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-compose
 ```
-git clone https://github.com/matter-labs/tutorial-examples.git
+
+To run docker commands without sudo, run:
+```bash
+sudo adduser $USER docker
+```
+Log out and log back in so that your group membership is re-evaluated.
+ 
+
+Verify that the Docker Engine installation is successful by running the hello-world image.
+```bash
+docker run hello-world
+```
+
+### Install latest Node.js LTS version and Yarn
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+```
+
+Log out and log back in.
+
+```bash
+nvm install --lts
+npm install --global yarn
+```
+
+
+
+
+## Change dummy prover/verifier to false in zksync server docker image
+Skip to [Start Test Net] if you want to stick to the default dummy prover 
+
+Update image
+```bash
+docker build -f zksync-image-update -t using-real-prover-verifier .
+```
+
+Verify the new image exist
+```bash
+docker image ls
+```
+
+Update docker-compose.yml
+```bash
+sed -i  -e 's/matterlabs\/local-node:latest2.0/using-real-prover-verifier/g' docker-compose.yml
+```
+
+## Start Test Net
+```bash
+./start
+```
+
+
+## test example
+```bash
 cd local-setup-testing
-yarn test
+npm install
+yarn test 
+```
+
+
+
+## bulk transfer example
+
+### Setup : 
+```bash
+cd bulk-transfer-test
+npm install
+```
+
+### Show rich wallet balances
+```bash
+npx hardhat balance --accounts-file wallets/rich-wallet.json
+```
+
+### Split one or more account N times 
+Example below : split the rich wallet (0x74d8b3a188f7260f67698eb44da07397a298df5427df681ef68c45b34b61f998) balance 10 times - creating a total of 1024 accounts saved in wallets/split.json
+```bash
+npx hardhat split --account "0x74d8b3a188f7260f67698eb44da07397a298df5427df681ef68c45b34b61f998" --iterations 10 --output-file wallets/split.json
+```
+
+### Send bulk transfer transactions 
+Example below : sends 100 transfer per bulk transfer between accounts listed in wallets/split.json. Whole process is repeated 2 times
+```bash
+npx hardhat bulkTx --accounts-file wallets/split.json --transfers 100 --iterations 2 
 ```
