@@ -137,16 +137,22 @@ async function bulkTransferTask(hre: any, { src_account_file, ntransfers, iterat
     const zkSyncProvider = new Provider(hre.network.config.url);
     const ethereumProvider = ethers.getDefaultProvider(hre.network.config.ethNetwork);
 
+    const shuffle_ftn = (array: accountInfoType[]) => {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const temp = array[i];
+            array[i] = array[j];
+            array[j] = temp;
+        }
+    }
+
     if (src_account_file != undefined) {
+        console.log(`\n\t - load file`)
         const jsonData = fs.readFileSync(src_account_file).toString();
         const acclist: string[] = JSON.parse(jsonData);
         acclist.map((privateKey) => accounts.push({ wallet: new Wallet(privateKey, zkSyncProvider, ethereumProvider), estBalance: ethers.BigNumber.from(0) }));
     } else {
         throw ("Should provide either a wallet file or a private key");
-    }
-
-    for (let i = 0; i < accounts.length; i++) {
-        accounts[i].estBalance = await zkSyncProvider.getBalance(accounts[i].wallet.address);
     }
 
     const rounds: number = (iterations == undefined) ? DEFAULT_N_ITERATIONS : iterations;
@@ -157,57 +163,42 @@ async function bulkTransferTask(hre: any, { src_account_file, ntransfers, iterat
 
     console.log(`\n\tSend ${no_of_transfers} transfer(s) ${rounds} time(s) `)
 
+    console.log(`\t - get initial balances`)
     for (let i = 0; i < accounts.length; i++) {
         accounts[i].estBalance = await zkSyncProvider.getBalance(accounts[i].wallet.address);
     }
 
+    console.log(`\t - build transfer information`)
     for (let round = 0; round < rounds; round++) {
 
-        // shuffle from/to wallets
-        let acc_list_temp: (accountInfoType | undefined)[] = accounts;
-        var transfer_from: accountInfoType | undefined;
         let tx_params: txParamsType[] = [];
 
-        while (tx_params.length < no_of_transfers) {
+        // shuffle account list
+        shuffle_ftn(accounts);
 
-            let selected_index = accounts.length;
-            while (selected_index >= accounts.length) {
-                selected_index = Math.floor(Math.random() * accounts.length * 2);
-            }
+        for (let i = 0; i < no_of_transfers; i++) {
 
-            let selected_account = acc_list_temp[selected_index];
+            const from = accounts[(i * 2)];
+            const to = accounts[(i * 2) + 1];
 
-            if (selected_account != undefined) {
+            const amount = from.estBalance.div(10);
+            from.estBalance = from.estBalance.sub(amount);
+            to.estBalance = to.estBalance.add(amount);
 
-                if (transfer_from == undefined) {
-
-                    transfer_from = selected_account;
-
-                } else {
-
-                    const amount = transfer_from.estBalance.div(10);
-                    transfer_from.estBalance = transfer_from.estBalance.sub(amount);
-                    selected_account.estBalance = selected_account.estBalance.add(amount);
-
-                    tx_params.push({
-                        from: transfer_from,
-                        to: selected_account,
-                        amount: amount,
-                    })
-
-                    transfer_from = undefined;
-                }
-
-                acc_list_temp[selected_index] = undefined;
-            }
+            tx_params.push({
+                from: from,
+                to: to,
+                amount: amount,
+            })
         }
 
         all_tx_params.push(tx_params);
     }
 
+    console.log(`\t - begin transfer`)
     for (let round = 0; round < rounds; round++) {
 
-        console.log(`\t - round ${round + 1} `);
+        console.log(`\t   - round ${round + 1} `);
         const tx_params = all_tx_params[round];
 
         for (let i = 0; i < tx_params.length; i++) {
@@ -223,6 +214,7 @@ async function bulkTransferTask(hre: any, { src_account_file, ntransfers, iterat
             tx_params[i].receipt = await (await (handle as Promise<types.TransactionResponse>)).waitFinalize();
         }
     }
+    console.log(`\t - transfer complete`)
 
     for (let round = 0; round < rounds; round++) {
         const tx_params = all_tx_params[round];

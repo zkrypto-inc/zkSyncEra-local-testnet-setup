@@ -76,7 +76,7 @@ sed -i  -e 's/matterlabs\/local-node:latest2.0/using-real-prover-verifier/g' doc
 
 ## Start Test Net
 ```bash
-./start
+./start.sh
 ```
 
 
